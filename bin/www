@@ -8,6 +8,10 @@ var app = require('../app');
 var debug = require('debug')('server:server');
 var http = require('http');
 
+const WebSocket = require('ws');
+const url = require('url');
+// const requests = require('requests');
+
 /**
  * Get port from environment and store in Express.
  */
@@ -28,6 +32,7 @@ var server = http.createServer(app);
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
+server.on('upgrade', onUpgrade);
 
 /**
  * Normalize a port into a number, string, or false.
@@ -88,3 +93,22 @@ function onListening() {
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
 }
+
+const wss = new WebSocket.Server({ noServer: true });
+
+function onUpgrade(request, socket, head) {
+  const pathname = url.parse(request.url).pathname;
+
+  if (pathname === '/ws') {
+    wss.handleUpgrade(request, socket, head, function done(ws) {
+      wss.emit('connection', ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+}
+
+wss.on('connection', function connection(ws) {
+  app.emit("wsConnection", ws);
+});
+
