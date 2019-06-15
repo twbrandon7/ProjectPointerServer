@@ -6,6 +6,8 @@ var logger = require('morgan');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+var controllRouter = require('./routes/controll');
+var webSocket = require('./routes/websocket');
 
 var app = express();
 
@@ -21,6 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/controll', controllRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -39,10 +42,7 @@ app.use(function (err, req, res, next) {
 });
 
 app.on('wsConnection', function connection(ws) {
-  ws.on('message', function incoming(data) {
-    console.log(data);
-    ws.send(data);
-  });
+  webSocket.onConnection(ws);
 });
 
 module.exports = app;
