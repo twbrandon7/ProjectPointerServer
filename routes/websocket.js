@@ -32,12 +32,14 @@ class Client {
         this.ws = ws;
         this.id = null;
         this.timeout = 15; //seconds
+        this.role = null;
+        this.opposite = null;
         var client = this;
 
-        ws.on('message', function(data){
+        ws.on('message', function (data) {
             client.onMessage(data);
         });
-        ws.on('close', function() {
+        ws.on('close', function () {
             delete routeTable[client.id];
         });
         this.processTimeout();
@@ -48,19 +50,23 @@ class Client {
         try {
             json = JSON.parse(data);
         } catch (e) {
-            ws.send(getServerMessage("error", "JSON Parse Error"));
+            this.ws.send(getServerMessage("error", "JSON Parse Error"));
             return;
         }
 
         if (this.id == null) {
-            if(json.type == "start") {
+            if (json.type == "start") {
                 this.setID();
-                this.ws.send(getServerMessage("set", "ok", {
+                this.ws.send(getServerMessage("start", "ok", {
                     id: this.id
                 }, this.id));
             } else {
-                ws.send(getServerMessage("error", "procedure error"));
+                this.ws.send(getServerMessage("error", "procedure error"));
             }
+        } else if (this.role == null) {
+            this.processSetup(json);
+        } else if (this.role == "control" && this.opposite == null) {
+            this.processOpposite(json);
         } else {
             this.process(json);
         }
@@ -69,18 +75,94 @@ class Client {
     setID() {
         do {
             this.id = makeid(32);
-        } while(routeTable[this.id] != null);
+        } while (routeTable[this.id] != null);
         routeTable[this.id] = this;
     }
 
-    process(json) {
-        var x = [];
-        for(key in routeTable) {
-            x.push(key);
+    processSetup(json) {
+        if (json.type == "set") {
+            if (json.role == "control" || json.role == "display") {
+                this.role = json.role;
+                this.ws.send(
+                    getServerMessage("set", "ok", {
+                        role: json.role
+                    }, this.id)
+                );
+            } else {
+                this.ws.send(getServerMessage("error", "command error", {}, this.id));
+            }
+        } else {
+            this.ws.send(getServerMessage("error", "procedure error", {}, this.id));
         }
-        this.ws.send(getServerMessage("control", "ok", {
-            list: x.join(", ")
-        }));
+    }
+
+    processOpposite(json) {
+        if (json.type == "set") {
+            if(json.opposite && routeTable[json.opposite] != null) {
+                this.opposite = routeTable[json.opposite];
+                routeTable[json.opposite].opposite = this;
+                this.ws.send(
+                    getServerMessage("set", "ok", {
+                        opposite: json.opposite
+                    }, this.id)
+                );
+                this.opposite.ws.send(
+                    getServerMessage("set", "ok", {
+                        opposite: this.id
+                    }, json.opposite)
+                );
+            } else {
+                this.ws.send(getServerMessage("error", "opposite notfound", {}, this.id));
+            }
+        } else {
+            this.ws.send(getServerMessage("error", "procedure error", {}, this.id));
+        }
+    }
+
+    process(json) {
+        if(this.role == "control") {
+            this.processControl(json);
+        } else if(this.role == "display") {
+            this.processDisplay(json);
+        } else {
+            this.ws.send(getServerMessage("error", "role with strange type", {role: this.role}, this.id));
+        }
+    }
+
+    processControl(json) {
+        if(json.type == "control" && json.command) {
+            this.opposite.sendControl(this.id, json.command);
+        } else {
+            this.ws.send(getServerMessage("error", "command error", {}, this.id));
+        }
+    }
+
+    processDisplay(json) {
+        if(json.type == "response" && json.message) {
+            this.opposite.sendResponse(this.id, json.message);
+        } else {
+            this.ws.send(getServerMessage("error", "command error", {}, this.id));
+        }
+    }
+
+    sendControl(source, message) {
+        var obj = {
+            type: "control",
+            command: message,
+            source: source,
+            destination: this.id,
+        };
+        this.ws.send(JSON.stringify(obj));
+    }
+
+    sendResponse(source, message) {
+        var obj = {
+            type: "response",
+            message: message,
+            source: source,
+            destination: this.id,
+        };
+        this.ws.send(JSON.stringify(obj));
     }
 
     processTimeout() {
