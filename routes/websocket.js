@@ -171,7 +171,7 @@ class Client {
     keepalive() {
         var client = this;
         this.keepaliveTimer = setInterval(function () {
-            client.ws.send(client.getServerMessage("keepalive", "ok"));
+            client.ws.send(getServerMessage("keepalive", "ok"));
         }, 5000);
     }
 
