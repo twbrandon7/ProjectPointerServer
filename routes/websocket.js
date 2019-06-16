@@ -34,6 +34,7 @@ class Client {
         this.timeout = 15; //seconds
         this.role = null;
         this.opposite = null;
+        this.keepaliveTimer = null;
         var client = this;
 
         ws.on('message', function (data) {
@@ -41,8 +42,10 @@ class Client {
         });
         ws.on('close', function () {
             delete routeTable[client.id];
+            clearInterval(client.keepaliveTimer);
         });
         this.processTimeout();
+        this.keepalive();
     }
 
     onMessage(data) {
@@ -167,7 +170,7 @@ class Client {
 
     keepalive() {
         var client = this;
-        var timer = setInterval(function () {
+        keepaliveTimer = setInterval(function () {
             client.ws.send(client.getServerMessage("keepalive", "ok"));
         }, 5000);
     }
