@@ -4,3 +4,4 @@ npm-debug.log
 .env
 .DS_Store
 key/*.json
+package-lock.json
