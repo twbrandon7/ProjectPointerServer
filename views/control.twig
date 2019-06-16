@@ -1,0 +1,128 @@
+{% extends 'layout.twig' %}
+
+{% block head %}
+<link rel='stylesheet' href='/stylesheets/style.css' />
+{% endblock %}
+
+{% block body %}
+    <!--<h1>{{title}}</h1>-->
+    <section class="container">
+        <div class="left-half">
+            <article>
+                <p>
+                    <i class="fas fa-chevron-up" style="font-size:200px;"></i>
+                </p>
+            </article>
+        </div>
+        <div class="right-half">
+            <article>
+                <p>
+                    <i class="fas fa-chevron-down" style="font-size:200px;"></i>
+                </p>
+            </article>
+        </div>
+    </secion>
+{% endblock %}
+
+{% block script %}
+    <script>
+        var wsUri = "ws://localhost:3000/ws";
+
+        var STATE_INITIAL = -1;
+        var STATE_WAIT_ID = 0;
+        var STATE_WAIT_ROLE = 1;
+        var STATE_WAIT_CONTROL = 2;
+        var STATE_START = 3;
+
+        var currentState = STATE_INITIAL;
+        var id = null;
+        var remoteId = "{{id}}";
+        var isOpne = false;
+
+        function init() {
+            testWebSocket();
+        }
+
+        function testWebSocket() {
+            websocket = new WebSocket(wsUri);
+            websocket.onopen = function (evt) {
+                onOpen(evt)
+            };
+            websocket.onclose = function (evt) {
+                onClose(evt)
+            };
+            websocket.onmessage = function (evt) {
+                onMessage(evt)
+            };
+            websocket.onerror = function (evt) {
+                onError(evt)
+            };
+        }
+
+        function onOpen(evt) {
+            isOpne = true;
+            console.log("CONNECTED");
+        }
+
+        function onClose(evt) {
+            console.log("DISCONNECTED");
+        }
+
+        function onMessage(evt) {
+            console.log("RECEIVE: " + evt.data);
+            var json = JSON.parse(evt.data);
+            if (currentState == STATE_INITIAL && json.type == "start") {
+                currentState = STATE_WAIT_ID;
+                doSend('{"type":"start"}');
+            } else if (currentState == STATE_WAIT_ID) {
+                if (json.type == "start" && json.id) {
+                    currentState = STATE_WAIT_ROLE;
+                    id = json.id;
+                    doSend('{"type":"set", "role":"control"}');
+                } else {
+                    console.error(evt.data);
+                }
+            } else if (currentState == STATE_WAIT_ROLE) {
+                if (json.type == "set" && json.message == "ok") {
+                    console.log("Initialize done. Conneting...");
+                    currentState = STATE_WAIT_CONTROL;
+                    doSend('{"type":"set", "opposite":"' + remoteId + '"}');
+                } else {
+                    console.error(evt.data);
+                }
+            } else if (currentState == STATE_WAIT_CONTROL) {
+                if (json.type == "set" && json.message == "ok") {
+                    currentState = STATE_START;
+                    console.log("Connected!");
+                }
+            } else if (currentState == STATE_START) {
+                if (json.type == "response") {
+                    console.log("response : " + json.message);
+                }
+            }
+        }
+
+        function onError(evt) {
+            console.error(evt.data);
+        }
+
+        function doSend(message) {
+            console.log("SENT: " + message);
+            websocket.send(message);
+        }
+
+        window.addEventListener("load", init, false);
+
+        $(".left-half").click(function() {
+          if(isOpne) {
+            doSend('{"type": "control", "command": "UP"}');
+          }
+        });
+
+        $(".right-half").click(function() {
+          if(isOpne) {
+            doSend('{"type": "control", "command": "DOWN"}');
+          }
+        });
+    </script>
+{% endblock %}
