@@ -71,6 +71,11 @@
         function onMessage(evt) {
             console.log("RECEIVE: " + evt.data);
             var json = JSON.parse(evt.data);
+
+            if(json.type == "keepalive") {
+                return;
+            }
+
             if (currentState == STATE_INITIAL && json.type == "start") {
                 currentState = STATE_WAIT_ID;
                 doSend('{"type":"start"}');

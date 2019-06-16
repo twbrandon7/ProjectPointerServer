@@ -165,6 +165,13 @@ class Client {
         this.ws.send(JSON.stringify(obj));
     }
 
+    keepalive() {
+        var client = this;
+        var timer = setInterval(function () {
+            client.ws.send(client.getServerMessage("keepalive", "ok"));
+        }, 5000);
+    }
+
     processTimeout() {
         var client = this;
         var timer = setInterval(function () {
